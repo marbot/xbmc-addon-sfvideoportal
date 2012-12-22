@@ -35,13 +35,31 @@ PARAMETER_KEY_TITLE = "title"
 PARAMETER_KEY_POS   = "pos"
 
 ITEM_TYPE_FOLDER, ITEM_TYPE_VIDEO = range(2)
-BASE_URL = "http://www.videoportal.sf.tv"
-FLASH_PLAYER = "http://www.videoportal.sf.tv/flash/videoplayer.swf"
+BASE_URL = "http://www.srf.ch/"
+BASE_URL_PLAYER = "http://www.srf.ch/player/tv"
+BASE_URL_WEBSERVICE = "http://www.srf.ch/webservice/"
+FLASH_PLAYER = "http://www.srf.ch/player/tv/flash/videoplayer.swf"
 
 settings = xbmcaddon.Addon( id=PLUGINID)
 
 LIST_FILE = os.path.join( settings.getAddonInfo( "path"), "resources", "list.dat")
 listItems = []
+
+# DEBUGGER
+REMOTE_DBG = True 
+
+# append pydev remote debugger
+if REMOTE_DBG:
+    # Make pydev debugger works for auto reload.
+    # Note pydevd module need to be copied in XBMC\system\python\Lib\pysrc
+    try:
+        import pysrc.pydevd as pydevd
+    # stdoutToServer and stderrToServer redirect stdout and stderr to eclipse console
+        pydevd.settrace('localhost', stdoutToServer=True, stderrToServer=True)
+    except ImportError:
+        sys.stderr.write("Error: " +
+            "You must add org.python.pydev.debug.pysrc to your PYTHONPATH.")
+        sys.exit(1)
 
 #
 # utility functions
@@ -93,10 +111,14 @@ def addDirectoryItem( type, name, params={}, image="", total=0):
 def getIdFromUrl( url):
     return re.compile( 'id=([0-9a-z\-]+)').findall( url)[0]
 
+def getUrlWithoutId( url):
+    return url.split('?')[0]
+
 
 def getJSONForId( id):
-    json_url = BASE_URL + "/cvis/segment/" + id + "/.json?nohttperr=1;omit_video_segments_validity=1;omit_related_segments=1"
-    json = simplejson.loads( fetchHttp( json_url).split( "\n")[1])
+    json_url = BASE_URL + "videoplayer/embed/" + id + "/.json?nohttperr=1;omit_video_segments_validity=1;omit_related_segments=1"
+    url = fetchHttp( json_url).split( "\n")[1]
+    json = simplejson.loads( url)
     return json
 
 
@@ -110,10 +132,11 @@ def getVideoFromJSON( json):
     
     return sortedstreams[ quality]["url"] + " swfvfy=true swfurl=" + FLASH_PLAYER
 
-
+def getVideoUrlForId( id):
+    return BASE_URL + "videoplayer/embed/" + id + "/.json?nohttperr=1;omit_video_segments_validity=1;omit_related_segments=1"
 
 def getThumbnailForId( id):
-    thumb = BASE_URL + "/cvis/videogroup/thumbnail/" + id + "?width=200"
+    thumb = BASE_URL_WEBSERVICE + "cvis/videogroup/thumbnail/" + id + "?width=200"
     return thumb
 
 
@@ -146,7 +169,7 @@ def list_prev_sendungen( sendid, soup, alreadylisted=0, selected=0):
 
     # check for more 'history'
     nextpage = None
-    baseurl = BASE_URL + "/sendung"
+    baseurl = BASE_URL_PLAYER + "/sendung"
     pagination = soup.find( "p", "pagination")
     if (pagination):
         log( "pagination")
@@ -162,7 +185,7 @@ def list_prev_sendungen( sendid, soup, alreadylisted=0, selected=0):
                 nextpage = curpage+1;
 
     if not nextpage:
-        nexturl = BASE_URL + soup.find( "div", "grey_box sendung_nav").find( "a")["href"]
+        nexturl = BASE_URL_PLAYER + soup.find( "div", "grey_box sendung_nav").find( "a")["href"]
 
     if nextpage:
         log( "nextpage: %d" % nextpage)
@@ -188,27 +211,27 @@ def list_prev_sendungen( sendid, soup, alreadylisted=0, selected=0):
 def show_root_menu():
     addDirectoryItem( ITEM_TYPE_FOLDER, "Sendungen", {PARAMETER_KEY_MODE: MODE_SENDUNGEN})
     addDirectoryItem( ITEM_TYPE_FOLDER, "Sendungen nach Thema", {PARAMETER_KEY_MODE: MODE_SENDUNGEN_ALLTOPICS})
-    addDirectoryItem( ITEM_TYPE_FOLDER, "Sendung verpasst?", {PARAMETER_KEY_MODE: MODE_VERPASST})
+    addDirectoryItem( ITEM_TYPE_FOLDER, "Sendung verpaasst?", {PARAMETER_KEY_MODE: MODE_VERPASST})
     addDirectoryItem( ITEM_TYPE_FOLDER, "Channels", {PARAMETER_KEY_MODE: MODE_CHANNEL_LIST})
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
 def show_sendungen():
-    url = BASE_URL + "/sendungen"
+    url = BASE_URL_PLAYER + "/sendungen"
     soup = BeautifulSoup( fetchHttp( url))
     
-    for show in soup.findAll( "div", "az_row"):
+    for show in soup.findAll( "div", "az_item"):
         url = show.find( "a")['href']
         title = show.find( "img", "az_thumb")['alt']
         id = getIdFromUrl( url)
         image = getThumbnailForId( id)
-        addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_SENDUNG, PARAMETER_KEY_ID: id }, image)
+        addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_SENDUNG, PARAMETER_KEY_ID: id, PARAMETER_KEY_URL: url }, image)
 
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
 def show_sendungen_alltopics():
-    url = BASE_URL + "/sendungen"
+    url = BASE_URL_PLAYER + "/sendungen"
     soup = BeautifulSoup( fetchHttp( url, { "sort": "topic"}))
 
     for topic in soup.findAll( "div", "grey_box"):
@@ -219,15 +242,15 @@ def show_sendungen_alltopics():
 
 
 def show_sendungen_topic( params):
-    url = BASE_URL + "/sendungen"
+    url = BASE_URL_PLAYER + "/sendungen"
     selected_topic = params.get( PARAMETER_KEY_ID)
     soup = BeautifulSoup( fetchHttp( url, {"sort": "topic"}))
 
     for topic in soup.findAll( "div", "az_unit"):
-        t = topic.find("h2").string
-        print t
+        #t = topic.find("h2").string
+        #print t
         if (t == selected_topic):
-            for show in topic.findAll( "div", "az_row"):
+            for show in topic.findAll( "div", "az_item"):
                 url = show.find( "a")['href']
                 title = show.find( "img", "az_thumb")['alt']
                 id = getIdFromUrl( url)
@@ -240,31 +263,42 @@ def show_sendungen_topic( params):
 
 def show_sendung( params):
     sendid = params.get( PARAMETER_KEY_ID)
-    url = BASE_URL + "/sendung"
-    soup = BeautifulSoup( fetchHttp( url, { "id": sendid }))
+    urlParam = params.get( PARAMETER_KEY_URL)
+    url = BASE_URL + getUrlWithoutId( urlParam)
+    soup = BeautifulSoup( fetchHttp( url, {"id": sendid}))
 
+    for show in soup.findAll( "div", "sendung_item"):
+        title = show.find( "div", "title").text
+        titleDate = show.find( "div", "title_date").text
+        image = show.find( "img")['src']
+        a = show.find( "a")
+        id = getIdFromUrl( a['href'])
+        addDirectoryItem( ITEM_TYPE_VIDEO, title + " " + titleDate, {PARAMETER_KEY_MODE: MODE_PLAY, PARAMETER_KEY_ID: id }, image)
+
+    xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
     # current show
-    show = soup.find( "div", "act_sendung_info")
-    a = show.find( "a", { "class": None})
-    title = a.string
-    id = getIdFromUrl( a['href'])
-    thumb = re.sub( '\?width=\\d+', '?width=200', show.find( "a").img['src'])
-    addDirectoryItem( ITEM_TYPE_VIDEO, title, {PARAMETER_KEY_MODE: MODE_PLAY, PARAMETER_KEY_ID: id}, thumb)
-
-    # previous shows
-    listed = list_prev_sendungen( sendid, soup, 1)
+#    show = soup.find( "div", {"id": "description"})
+#    title = soup.find( "div", {"id": "title"})
+#    id = getIdFromUrl( a['href'])
+#    thumb = re.sub( '\?width=\\d+', '?width=200', show.find( "a").img['src'])
+#    addDirectoryItem( ITEM_TYPE_VIDEO, title, {PARAMETER_KEY_MODE: MODE_PLAY, PARAMETER_KEY_ID: id}, thumb)
+#
+#
+#
+#    # previous shows
+#    listed = list_prev_sendungen( sendid, soup, 1)
 
 def show_prev_sendung( params):
     id = params.get( PARAMETER_KEY_ID)
     page = params.get( PARAMETER_KEY_PAGE)
-    url = BASE_URL + "/sendung"
+    url = BASE_URL_PLAYER + "/sendung"
     log( "id: %s" % id)
     log( "page: %s" % page)
     soup = BeautifulSoup( fetchHttp( url, { "id": id, "page": page }))
     list_prev_sendungen( id, soup, selected=params.get( "pos"))
 
 def show_verpasst():
-    url = BASE_URL + "/verpasst"
+    url = BASE_URL_PLAYER + "verpasst"
     html = fetchHttp( url)
     match = re.compile( '<a class="day_line.+?href="(.+?)"><span class="day_name">(.+?)</span><span class="day_date">(.+?)</span></a>').findall( html.replace( "\n", ""))
     for url,name,date in match:
@@ -275,7 +309,7 @@ def show_verpasst():
 
 
 def show_verpasst_detail( params):
-    url = BASE_URL + "/verpasst" + params.get( PARAMETER_KEY_URL)
+    url = BASE_URL_PLAYER + "/verpasst" + params.get( PARAMETER_KEY_URL)
     soup = BeautifulSoup( fetchHttp( url))
     day = soup.find( "div", "sendungen_missed_column")
     if "inact" in day["class"]:
@@ -294,13 +328,13 @@ def show_verpasst_detail( params):
 
 
 def show_channel_list():
-    url = BASE_URL + "/channels"
+    url = BASE_URL_PLAYER + "/channels"
     soup = BeautifulSoup( fetchHttp( url))
     channels = soup.findAll( "h2", "hidden")
     for ch in channels:
         title = re.sub( "Channel\s+Channel", "Channel", ch.string)
-        link = BASE_URL + ch.parent.find( "a")["href"]
-        thumb = BASE_URL + ch.parent.find( "img")["src"]
+        link = BASE_URL_PLAYER + ch.parent.find( "a")["href"]
+        thumb = BASE_URL_PLAYER + ch.parent.find( "img")["src"]
         addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_CHANNEL, PARAMETER_KEY_URL: link}, thumb, len( channels))
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
@@ -355,6 +389,7 @@ elif mode == MODE_PLAY:
     id = params["id"]
     json = getJSONForId( id)
     url = getVideoFromJSON( json)
+#    url = getVideoUrlForId(id)
     if "mark_in" in json.keys( ):
         start = json["mark_in"]
     elif "mark_in" in json["video"]["segments"][0].keys():
