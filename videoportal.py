@@ -46,7 +46,7 @@ LIST_FILE = os.path.join( settings.getAddonInfo( "path"), "resources", "list.dat
 listItems = []
 
 # DEBUGGER
-REMOTE_DBG = False 
+REMOTE_DBG = True 
 
 # append pydev remote debugger
 if REMOTE_DBG:
@@ -109,9 +109,9 @@ def addDirectoryItem( type, name, params={}, image="", total=0):
 ############################################
 
 def getIdFromUrl( url):
-    return re.compile( 'id=([0-9a-z\-]+)').findall( url)[0]
+    return re.compile( '[\?|\&]id=([0-9a-z\-]+)').findall( url)[0]
 
-def getUrlWithoutId( url):
+def getUrlWithoutParams( url):
     return url.split('?')[0]
 
 
@@ -231,10 +231,10 @@ def show_sendungen():
 
 
 def show_sendungen_alltopics():
-    url = BASE_URL_PLAYER + "/sendungen"
-    soup = BeautifulSoup( fetchHttp( url, { "sort": "topic"}))
+    url = BASE_URL_PLAYER + "/themen"
+    soup = BeautifulSoup( fetchHttp( url))
 
-    for topic in soup.findAll( "div", "grey_box"):
+    for topic in soup.findAll( "div", "themen_metadata"):
         title = topic.find("h2").string
         addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_SENDUNGEN_TOPIC, PARAMETER_KEY_ID: title})
 
@@ -242,21 +242,26 @@ def show_sendungen_alltopics():
 
 
 def show_sendungen_topic( params):
-    url = BASE_URL_PLAYER + "/sendungen"
     selected_topic = params.get( PARAMETER_KEY_ID)
-    soup = BeautifulSoup( fetchHttp( url, {"sort": "topic"}))
+    url = BASE_URL_PLAYER + "/thema/" + selected_topic
+    soup = BeautifulSoup( fetchHttp( url, {"cid": selected_topic}))
 
-    for topic in soup.findAll( "div", "az_unit"):
-        #t = topic.find("h2").string
-        #print t
-        if (t == selected_topic):
-            for show in topic.findAll( "div", "az_item"):
-                url = show.find( "a")['href']
-                title = show.find( "img", "az_thumb")['alt']
-                id = getIdFromUrl( url)
-                image = getThumbnailForId( id)
-                addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_SENDUNG, PARAMETER_KEY_ID: id}, image)
-            break
+    for show in soup.findAll( "div", "sendung_box_item"):
+       url = show.find( "a")['href']
+       title = show.find( "div", "title").text
+       id = getIdFromUrl( url)
+       image = getUrlWithoutParams(show.find( "img")['src'])
+       addDirectoryItem( ITEM_TYPE_VIDEO, title, {PARAMETER_KEY_MODE: MODE_PLAY, PARAMETER_KEY_ID: id}, image)
+
+#    for topic in soup.findAll( "div", "sendung_box_item"):
+#        if (t == selected_topic):
+#            for show in topic.findAll( "div", "az_item"):
+#                url = show.find( "a")['href']
+#                title = show.find( "img", "az_thumb")['alt']
+#                id = getIdFromUrl( url)
+#                image = getThumbnailForId( id)
+#                addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_SENDUNG, PARAMETER_KEY_ID: id}, image)
+#            break
 
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
@@ -264,13 +269,13 @@ def show_sendungen_topic( params):
 def show_sendung( params):
     sendid = params.get( PARAMETER_KEY_ID)
     urlParam = params.get( PARAMETER_KEY_URL)
-    url = BASE_URL + getUrlWithoutId( urlParam)
+    url = BASE_URL + getUrlWithoutParams( urlParam)
     soup = BeautifulSoup( fetchHttp( url, {"id": sendid}))
 
     for show in soup.findAll( "div", "sendung_item"):
         title = show.find( "div", "title").text
         titleDate = show.find( "div", "title_date").text
-        image = show.find( "img")['src']
+        image = getUrlWithoutParams( show.find( "img")['src'])
         a = show.find( "a")
         id = getIdFromUrl( a['href'])
         addDirectoryItem( ITEM_TYPE_VIDEO, title + " " + titleDate, {PARAMETER_KEY_MODE: MODE_PLAY, PARAMETER_KEY_ID: id }, image)
