@@ -38,7 +38,7 @@ ITEM_TYPE_FOLDER, ITEM_TYPE_VIDEO = range(2)
 BASE_URL = "http://www.srf.ch/"
 BASE_URL_PLAYER = "http://www.srf.ch/player/tv"
 BASE_URL_WEBSERVICE = "http://www.srf.ch/webservice/"
-FLASH_PLAYER = "http://www.srf.ch/player/tv/flash/videoplayer.swf"
+FLASH_PLAYER = "http://www.videoportal.sf.tv/flash/videoplayer.swf"
 
 settings = xbmcaddon.Addon( id=PLUGINID)
 
@@ -46,7 +46,7 @@ LIST_FILE = os.path.join( settings.getAddonInfo( "path"), "resources", "list.dat
 listItems = []
 
 # DEBUGGER
-REMOTE_DBG = True 
+REMOTE_DBG = False 
 
 # append pydev remote debugger
 if REMOTE_DBG:
@@ -116,7 +116,7 @@ def getUrlWithoutId( url):
 
 
 def getJSONForId( id):
-    json_url = BASE_URL + "videoplayer/embed/" + id + "/.json?nohttperr=1;omit_video_segments_validity=1;omit_related_segments=1"
+    json_url = BASE_URL + "/webservice/cvis/segment/" + id + "/.json?nohttperr=1;omit_video_segments_validity=1;omit_related_segments=1"
     url = fetchHttp( json_url).split( "\n")[1]
     json = simplejson.loads( url)
     return json
