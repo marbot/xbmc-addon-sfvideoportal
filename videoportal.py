@@ -46,7 +46,7 @@ LIST_FILE = os.path.join( settings.getAddonInfo( "path"), "resources", "list.dat
 listItems = []
 
 # DEBUGGER
-REMOTE_DBG = True 
+REMOTE_DBG = False 
 
 # append pydev remote debugger
 if REMOTE_DBG:
@@ -303,31 +303,60 @@ def show_prev_sendung( params):
     list_prev_sendungen( id, soup, selected=params.get( "pos"))
 
 def show_verpasst():
-    url = BASE_URL_PLAYER + "verpasst"
-    html = fetchHttp( url)
-    match = re.compile( '<a class="day_line.+?href="(.+?)"><span class="day_name">(.+?)</span><span class="day_date">(.+?)</span></a>').findall( html.replace( "\n", ""))
-    for url,name,date in match:
-        title = "%s, %s" % (date, name.strip())
-        addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_VERPASST_DETAIL, PARAMETER_KEY_URL: url})
+    url = BASE_URL_PLAYER + "/verpasst"
+
+    timestamp = 999999999999 # very high to get today.
+    for x in range(0, 7):
+        soup = BeautifulSoup( fetchHttp( url, { "date": timestamp}))
+        rightDay = soup.find( "div", { "id": "right_day"})
+        title = rightDay.find( "h2").text
+        timestamp = long(rightDay.find( "input", "timestamp")['value'])
+        addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_VERPASST_DETAIL, PARAMETER_KEY_POS: str(timestamp)})
+        timestamp = (timestamp - (24*60*60))
+        
+#    for show in soup.findAll( "div", { "id": "sendungen_missed_outer" }):
+#        title = show.find( "a", "title").text
+#        time = show.find( "p", "time").text
+#        image = getUrlWithoutParams( show.find( "img")['src'])
+#        a = show.find( "a")
+#        id = getIdFromUrl( a['href'])
+#        addDirectoryItem( ITEM_TYPE_VIDEO, time + ": " + title, {PARAMETER_KEY_MODE: MODE_PLAY, PARAMETER_KEY_ID: id }, image)
+            
+#    match = re.compile( '<a class="day_line.+?href="(.+?)"><span class="day_name">(.+?)</span><span class="day_date">(.+?)</span></a>').findall( html.replace( "\n", ""))
+#    for url,name,date in match:
+#        title = "%s, %s" % (date, name.strip())
+#        addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_VERPASST_DETAIL, PARAMETER_KEY_URL: url})
 
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
 def show_verpasst_detail( params):
-    url = BASE_URL_PLAYER + "/verpasst" + params.get( PARAMETER_KEY_URL)
-    soup = BeautifulSoup( fetchHttp( url))
-    day = soup.find( "div", "sendungen_missed_column")
-    if "inact" in day["class"]:
-        day = soup.findAll( "div", "sendungen_missed_column")[1]
-    shows =  day.findAll( "div", "sendung_item")
-    for show in shows:
-        url = show.find( "a")["href"]
-        name = show.find( "img")["title"]
-        thumb = re.sub( '\?width=[0-9]+', '?width=200', show.find( "img")["src"])
-        time = show.find( "p", "time").string
-        id = getIdFromUrl( url)
-        title = "%s, %s" % (time, name)
-        addDirectoryItem( ITEM_TYPE_VIDEO, title, {PARAMETER_KEY_MODE: MODE_PLAY, PARAMETER_KEY_ID: id}, thumb, len( shows))
+    url = BASE_URL_PLAYER + "/verpasst"
+    timestamp = params.get( PARAMETER_KEY_POS)
+    soup = BeautifulSoup( fetchHttp( url, { "date": timestamp}))
+    
+    rightDay = soup.find( "div", { "id": "right_day"})
+    
+    for show in rightDay.findAll( "div", "overlay_sendung_item"):
+        title = show.find( "a", "title").text
+        time = show.find( "p", "time").text
+        image = getUrlWithoutParams( show.find( "img")['src'])
+        a = show.find( "a")
+        id = getIdFromUrl( a['href'])
+        addDirectoryItem( ITEM_TYPE_VIDEO, time + ": " + title, {PARAMETER_KEY_MODE: MODE_PLAY, PARAMETER_KEY_ID: id }, image)
+        
+#    day = soup.find( "div", "sendungen_missed_column")
+#    if "inact" in day["class"]:
+#        day = soup.findAll( "div", "sendungen_missed_column")[1]
+#    shows =  day.findAll( "div", "sendung_item")
+#    for show in shows:
+#        url = show.find( "a")["href"]
+#        name = show.find( "img")["title"]
+#        thumb = re.sub( '\?width=[0-9]+', '?width=200', show.find( "img")["src"])
+#        time = show.find( "p", "time").string
+#        id = getIdFromUrl( url)
+#        title = "%s, %s" % (time, name)
+#        addDirectoryItem( ITEM_TYPE_VIDEO, title, {PARAMETER_KEY_MODE: MODE_PLAY, PARAMETER_KEY_ID: id}, thumb, len( shows))
 
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
