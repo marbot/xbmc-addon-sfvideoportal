@@ -28,7 +28,6 @@ MODE_PLAY            = "play"
 # parameter keys
 PARAMETER_KEY_MODE = "mode"
 PARAMETER_KEY_ID = "id"
-PARAMETER_KEY_PAGE = "page"
 PARAMETER_KEY_URL = "url"
 PARAMETER_KEY_TITLE = "title"
 PARAMETER_KEY_POS   = "pos"
@@ -36,8 +35,9 @@ PARAMETER_KEY_POS   = "pos"
 ITEM_TYPE_FOLDER, ITEM_TYPE_VIDEO = range(2)
 BASE_URL = "http://www.srf.ch/"
 BASE_URL_PLAYER = "http://www.srf.ch/player/tv"
-BASE_URL_WEBSERVICE = "http://www.srf.ch/webservice/"
+# it stangely only works with the old player. Maybe, SRF will switch to the new one at some time...
 FLASH_PLAYER = "http://www.videoportal.sf.tv/flash/videoplayer.swf"
+#FLASH_PLAYER = "http://www.srf.ch/player/tv/flash/videoplayer.swf"
 
 settings = xbmcaddon.Addon( id=PLUGINID)
 
@@ -132,7 +132,7 @@ def getVideoFromJSON( json):
     return sortedstreams[ quality]["url"] + " swfvfy=true swfurl=" + FLASH_PLAYER
 
 def getThumbnailForId( id):
-    thumb = BASE_URL_WEBSERVICE + "cvis/videogroup/thumbnail/" + id
+    thumb = BASE_URL + "webservice/cvis/videogroup/thumbnail/" + id
     return thumb
 
 
@@ -147,8 +147,8 @@ def getThumbnailForId( id):
 
 def show_root_menu():
     addDirectoryItem( ITEM_TYPE_FOLDER, "Sendungen", {PARAMETER_KEY_MODE: MODE_SENDUNGEN})
-    addDirectoryItem( ITEM_TYPE_FOLDER, "Sendungen nach Thema", {PARAMETER_KEY_MODE: MODE_SENDUNGEN_ALLTOPICS})
-    addDirectoryItem( ITEM_TYPE_FOLDER, "Sendung verpaasst?", {PARAMETER_KEY_MODE: MODE_VERPASST})
+    addDirectoryItem( ITEM_TYPE_FOLDER, "Themen", {PARAMETER_KEY_MODE: MODE_SENDUNGEN_ALLTOPICS})
+    addDirectoryItem( ITEM_TYPE_FOLDER, "Sendung verpasst?", {PARAMETER_KEY_MODE: MODE_VERPASST})
     addDirectoryItem( ITEM_TYPE_FOLDER, "Channels", {PARAMETER_KEY_MODE: MODE_CHANNEL_LIST})
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
