@@ -35,7 +35,7 @@ PARAMETER_KEY_POS   = "pos"
 ITEM_TYPE_FOLDER, ITEM_TYPE_VIDEO = range(2)
 BASE_URL = "http://www.srf.ch/"
 BASE_URL_PLAYER = "http://www.srf.ch/player/tv"
-# it stangely only works with the old player. Maybe, SRF will switch to the new one at some time...
+# for some reason, it only works with the old player version.
 FLASH_PLAYER = "http://www.videoportal.sf.tv/flash/videoplayer.swf"
 #FLASH_PLAYER = "http://www.srf.ch/player/tv/flash/videoplayer.swf"
 
@@ -45,20 +45,20 @@ LIST_FILE = os.path.join( settings.getAddonInfo( "path"), "resources", "list.dat
 listItems = []
 
 # DEBUGGER
-REMOTE_DBG = False 
+#REMOTE_DBG = False 
 
 # append pydev remote debugger
-if REMOTE_DBG:
-    # Make pydev debugger works for auto reload.
-    # Note pydevd module need to be copied in XBMC\system\python\Lib\pysrc
-    try:
-        import pysrc.pydevd as pydevd
-    # stdoutToServer and stderrToServer redirect stdout and stderr to eclipse console
-        pydevd.settrace('localhost', stdoutToServer=True, stderrToServer=True)
-    except ImportError:
-        sys.stderr.write("Error: " +
-            "You must add org.python.pydev.debug.pysrc to your PYTHONPATH.")
-        sys.exit(1)
+#if REMOTE_DBG:
+#    # Make pydev debugger works for auto reload.
+#    # Note pydevd module need to be copied in XBMC\system\python\Lib\pysrc
+#    try:
+#        import pysrc.pydevd as pydevd
+#    # stdoutToServer and stderrToServer redirect stdout and stderr to eclipse console
+#        pydevd.settrace('localhost', stdoutToServer=True, stderrToServer=True)
+#    except ImportError:
+#        sys.stderr.write("Error: " +
+#            "You must add org.python.pydev.debug.pysrc to your PYTHONPATH.")
+#        sys.exit(1)
 
 #
 # utility functions
