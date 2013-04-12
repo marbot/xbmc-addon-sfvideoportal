@@ -1,4 +1,3 @@
-
 import os, re, sys
 import urllib, urllib2, HTMLParser
 import xbmcgui, xbmcplugin, xbmcaddon
@@ -204,7 +203,7 @@ def show_sendung( params):
     soup = BeautifulSoup( fetchHttp( url, {"id": sendid}))
 
     for show in soup.findAll( "div", "sendung_item"):
-        title = show.find( "div", "title").text
+        title = show.find( "h2", "title").text
         titleDate = show.find( "div", "title_date").text
         image = getUrlWithoutParams( show.find( "img")['src'])
         a = show.find( "a")
