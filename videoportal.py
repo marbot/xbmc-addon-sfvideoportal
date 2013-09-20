@@ -1,4 +1,3 @@
-
 import os, re, sys
 from datetime import date, timedelta
 import urllib, urllib2, HTMLParser
@@ -129,14 +128,9 @@ def getJSONForId( id):
 
 
 def getVideoFromJSON( json):
-    streams = json["streaming_urls"]
-    sortedstreams = sorted( streams, key=lambda el: int(el["bitrate"]))
-
-    quality = int(settings.getSetting( id="quality"))
-    if (quality >= len(sortedstreams)):
-        quality = len(sortedstreams)-1;
-    
-    return sortedstreams[ quality]["url"] + " swfvfy=true swfurl=" + FLASH_PLAYER
+    playlist = json["playlists"]["playlist"]
+    index = len(playlist) - 2 # get the best quality
+    return playlist[index]["url"]
 
 def getThumbnailForId( id):
     thumb = BASE_URL + "webservice/cvis/videogroup/thumbnail/" + id
