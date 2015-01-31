@@ -1,3 +1,4 @@
+
 import os, re, sys
 from datetime import date, timedelta
 import urllib, urllib2, HTMLParser
@@ -5,6 +6,7 @@ import xbmcgui, xbmcplugin, xbmcaddon
 from mindmade import *
 import simplejson
 from BeautifulSoup import BeautifulSoup
+from selenium import webdriver
 
 __author__     = "Andreas Wetzel"
 __copyright__  = "Copyright 2011, 2012, mindmade.org"
@@ -22,8 +24,6 @@ pluginhandle = int(sys.argv[1])
 
 # plugin modes
 MODE_SENDUNGEN_AZ     = "sendungen_az"
-MODE_SENDUNGEN_THEMEN = "sendungen_themen"
-MODE_SENDUNGEN_THEMA  = "sendungen_thema"
 MODE_SENDUNG          = "sendung"
 MODE_SENDUNG_VERPASST = "sendung_verpasst"
 MODE_VERPASST_DETAIL  = "verpasst_detail"
@@ -40,7 +40,7 @@ PARAMETER_KEY_POS   = "pos"
 
 ITEM_TYPE_FOLDER, ITEM_TYPE_VIDEO = range(2)
 BASE_URL = "http://www.srf.ch/"
-BASE_URL_PLAYER = "http://www.srf.ch/player/tv"
+BASE_URL_PLAYER = "http://www.srf.ch/play/tv"
 # for some reason, it only works with the old player version.
 FLASH_PLAYER = "http://www.videoportal.sf.tv/flash/videoplayer.swf"
 #FLASH_PLAYER = "http://www.srf.ch/player/tv/flash/videoplayer.swf"
@@ -49,22 +49,21 @@ settings = xbmcaddon.Addon( id=PLUGINID)
 
 LIST_FILE = os.path.join( settings.getAddonInfo( "path"), "resources", "list.dat")
 listItems = []
-
 # DEBUGGER
-#REMOTE_DBG = False 
+REMOTE_DBG = False
 
 # append pydev remote debugger
-#if REMOTE_DBG:
-#    # Make pydev debugger works for auto reload.
-#    # Note pydevd module need to be copied in XBMC\system\python\Lib\pysrc
-#    try:
-#        import pysrc.pydevd as pydevd
-#    # stdoutToServer and stderrToServer redirect stdout and stderr to eclipse console
-#        pydevd.settrace('localhost', stdoutToServer=True, stderrToServer=True)
-#    except ImportError:
-#        sys.stderr.write("Error: " +
-#            "You must add org.python.pydev.debug.pysrc to your PYTHONPATH.")
-#        sys.exit(1)
+if REMOTE_DBG:
+   # Make pydev debugger works for auto reload.
+   # Note pydevd module need to be copied in XBMC\system\python\Lib\pysrc
+    try:
+        import pydevd
+   #stdoutToServer and stderrToServer redirect stdout and stderr to eclipse console
+        pydevd.settrace('localhost', port=5678, stdoutToServer=True, stderrToServer=True)
+    except ImportError:
+        sys.stderr.write("Error: " +
+           "You must add org.python.pydev.debug.pysrc to your PYTHONPATH.")
+        sys.exit(1)
 
 #
 # utility functions
@@ -121,6 +120,7 @@ def getUrlWithoutParams( url):
 
 
 def getJSONForId( id):
+    print 'get json for id' + id
     json_url = BASE_URL + "/webservice/cvis/segment/" + id + "/.json?nohttperr=1;omit_video_segments_validity=1;omit_related_segments=1"
     url = fetchHttp( json_url).split( "\n")[1]
     json = simplejson.loads( url)
@@ -128,9 +128,13 @@ def getJSONForId( id):
 
 
 def getVideoFromJSON( json):
-    playlist = json["playlists"]["playlist"]
-    index = len(playlist) - 2 # get the best quality
-    return playlist[index]["url"]
+    streams = json["playlists"]["playlist"]
+    index = 2 * int(settings.getSetting( id="quality"))
+    sortedstreams = sorted( streams, key=lambda el: int(el["quality"]))
+    if (index >= len(sortedstreams)):
+        index = len(sortedstreams)-2
+    
+    return sortedstreams[index]["url"]
 
 def getThumbnailForId( id):
     thumb = BASE_URL + "webservice/cvis/videogroup/thumbnail/" + id
@@ -148,46 +152,15 @@ def getThumbnailForId( id):
 
 def show_root_menu():
     addDirectoryItem( ITEM_TYPE_FOLDER, "Sendungen A-Z", {PARAMETER_KEY_MODE: MODE_SENDUNGEN_AZ})
-    addDirectoryItem( ITEM_TYPE_FOLDER, "Sendungen nach Thema", {PARAMETER_KEY_MODE: MODE_SENDUNGEN_THEMEN})
     addDirectoryItem( ITEM_TYPE_FOLDER, "Sendung verpasst?", {PARAMETER_KEY_MODE: MODE_SENDUNG_VERPASST})
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
 
 def show_sendungen_abisz():
     url = BASE_URL_PLAYER + "/sendungen"
-    soup = BeautifulSoup( fetchHttp( url))
+    soup = BeautifulSoup( getHttp( url, {}))
     
     for show in soup.findAll( "li", "az_item"):
-        url = show.find( "a")['href']
-        title = show.find( "img", "az_thumb")['alt']
-        id = getIdFromUrl( url)
-        image = getThumbnailForId( id)
-        addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_SENDUNG, PARAMETER_KEY_ID: id, PARAMETER_KEY_URL: url }, image)
-
-    xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
-
-
-def show_sendungen_thematisch():
-    url = BASE_URL_PLAYER + "/sendungen-nach-thema"
-    soup = BeautifulSoup( fetchHttp( url, {"sort": "topic"}))
-
-    topicNavigation = soup.find( "ul", {"id": "topic_navigation"})
-    for topic in topicNavigation.findAll( "li"):
-        title = topic.text
-        onClick = topic['onclick']
-        id = re.compile( '(az_unit_[a-zA-Z0-9_]*)').findall(onClick)[0]
-        addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_SENDUNGEN_THEMA, PARAMETER_KEY_ID: id})
-
-    xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
-
-
-def show_sendungen_thema( params):
-    selected_topic = params.get( PARAMETER_KEY_ID)
-    url = BASE_URL_PLAYER + "/sendungen-nach-thema"
-    soup = BeautifulSoup( fetchHttp( url , {"sort" : "topic"}))
-
-    topic = soup.find( "li", {"id" : selected_topic})
-    for show in topic.findAll( "li", "az_item"):
         url = show.find( "a")['href']
         title = show.find( "img", "az_thumb")['alt']
         id = getIdFromUrl( url)
@@ -201,7 +174,7 @@ def show_sendung( params):
     sendid = params.get( PARAMETER_KEY_ID)
     urlParam = params.get( PARAMETER_KEY_URL)
     url = BASE_URL + getUrlWithoutParams( urlParam)
-    soup = BeautifulSoup( fetchHttp( url, {"id": sendid}))
+    soup = BeautifulSoup( getHttp( url, {"id": sendid}))
 
     for show in soup.findAll( "li", "sendung_item"):
         title = show.find( "h3", "title").text
@@ -221,9 +194,9 @@ def show_verpasst():
     if not timestamp:
         # get srf's timestamp for "now"
         timestamp = 999999999999 # very high to get today.
-        soup = BeautifulSoup( fetchHttp( url, { "date": timestamp}))
-        rightDay = soup.find( "div", { "id": "right_day"})
-        timestamp = long(rightDay.find( "input", "timestamp")['value'])
+        soup = BeautifulSoup( getHttp( url, { "date": timestamp}))
+        rightday = soup.find( "div", { "id": "right_day"})
+        timestamp = long(rightday.find( "input", "timestamp")['value'])
 
     day = date.fromtimestamp( timestamp)
 
@@ -238,7 +211,7 @@ def show_verpasst():
 def show_verpasst_detail( params):
     url = BASE_URL_PLAYER + "/sendungen-nach-datum"
     timestamp = params.get( PARAMETER_KEY_POS)
-    soup = BeautifulSoup( fetchHttp( url, { "date": timestamp}))
+    soup = BeautifulSoup( getHttp( url, { "date": timestamp}))
     
     rightDay = soup.find( "div", { "id": "right_day"})
     
@@ -252,34 +225,17 @@ def show_verpasst_detail( params):
 
     xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
 
+def getHttp( url, param ):
+    dir = os.path.dirname(__file__)
+    phantomJsFile = os.path.join(dir, 'resources/phantomjs')
+    browser = webdriver.PhantomJS(executable_path=phantomJsFile)
 
-def show_themen():
-    url = BASE_URL
-    soup = BeautifulSoup( fetchHttp( url))
+    params = urllib.urlencode(param)
+    browser.get(url + '?' + params)
 
-    nav = soup.find( "div", "primary-nav")
-    for topic in nav.findAll( "a"):
-        title = topic.find("a").string
-        selected_url = topic.find("a")['href']
-        addDirectoryItem( ITEM_TYPE_FOLDER, title, {PARAMETER_KEY_MODE: MODE_THEMA, PARAMETER_KEY_ID: selected_url})
-
-    xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
-
-
-def show_thema( params):
-    selected_url = params.get( PARAMETER_KEY_ID)
-    url = BASE_URL + selected_url
-    soup = BeautifulSoup( fetchHttp( url ))
-
-    for show in soup.findAll( "div", "sendung_box_item"):
-        url = show.find( "a")['href']
-        title = show.find( "div", "title").text
-        id = getIdFromUrl( url)
-        image = getUrlWithoutParams(show.find( "img")['src'])
-        addDirectoryItem( ITEM_TYPE_VIDEO, title, {PARAMETER_KEY_MODE: MODE_PLAY, PARAMETER_KEY_ID: id}, image)
-
-    xbmcplugin.endOfDirectory(handle=pluginhandle, succeeded=True)
-        
+    html_source = browser.page_source
+    browser.quit()
+    return html_source
 
 #
 # xbmc entry point
@@ -298,20 +254,12 @@ if not sys.argv[2]:
     ok = show_root_menu()
 elif mode == MODE_SENDUNGEN_AZ:
     ok = show_sendungen_abisz()
-elif mode == MODE_SENDUNGEN_THEMEN:
-    ok = show_sendungen_thematisch()
-elif mode == MODE_SENDUNGEN_THEMA:
-    ok = show_sendungen_thema( params)
 elif mode == MODE_SENDUNG:
     ok = show_sendung(params)
 elif mode == MODE_SENDUNG_VERPASST:
     ok = show_verpasst()
 elif mode == MODE_VERPASST_DETAIL:
     ok = show_verpasst_detail(params)
-elif mode == MODE_THEMEN:
-    show_themen()
-elif mode == MODE_THEMA:
-    show_thema( params)
 elif mode == MODE_PLAY:
     id = params["id"]
     json = getJSONForId( id)
